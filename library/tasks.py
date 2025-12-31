@@ -1,44 +1,52 @@
-from django.utils import timezone
 from celery import shared_task
-from .models import Loan
+from django.conf import settings
 from django.core.mail import send_mail
-from django.conf import settings
+from django.utils import timezone
+
 from .models import Loan
-from django.conf import settings
+
+
 @shared_task
 def send_loan_notification(loan_id):
     try:
-        loan = Loan.objects.get(id=loan_id)
-        member_email = loan.member.user.email
-        book_title = loan.book.title
-        send_mail(
-            subject='Book Loaned Successfully',
-            message=f'Hello {loan.member.user.username},\n\nYou have successfully loaned "{book_title}".\nPlease return it by the due date.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[member_email],
-            fail_silently=False,
-        )
+        loan = Loan.objects.select_related('member__user', 'book').get(pk=loan_id)
     except Loan.DoesNotExist:
-        pass
+        return
+
+    if not loan.member.user.email:
+        return
+
+    send_mail(
+        subject='Book Loaned Successfully',
+        message=(
+            f'Hello {loan.member.user.username},\n\n'
+            f'You have successfully loaned "{loan.book.title}".\n'
+            f'Please return it by {loan.due_date:%Y-%m-%d}.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[loan.member.user.email],
+        fail_silently=False,
+    )
 
 
 @shared_task
 def check_overdue_loans():
-    today = timezone.now().date()
     overdue_loans = Loan.objects.filter(
         is_returned=False,
-        due_date=today,
-    ).select_related('member','member__user','book')
+        due_date__lt=timezone.localdate(),
+    ).select_related('member__user', 'book')
 
     for loan in overdue_loans:
         email = loan.member.user.email
         if not email:
             continue
-        
         send_mail(
-            subject="Overdue Book loan.",
-            message="Please return your book."
+            subject='Overdue library book',
+            message=(
+                f'Please return "{loan.book.title}". '
+                f'It was due on {loan.due_date:%Y-%m-%d}.'
+            ),
             from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
             fail_silently=False,
-            recipient_list=[email]
         )

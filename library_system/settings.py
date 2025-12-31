@@ -1,12 +1,11 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from celery.schedules import crontab
 
-load_dotenv()
 
 # Base Directory
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 # Security
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-default-secret-key')
@@ -104,7 +103,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'library_system.pagination.DefaultPagination'.
+    'DEFAULT_PAGINATION_CLASS': 'library.pagination.DefaultPagination',
     'PAGE_SIZE':10,
 }
 
