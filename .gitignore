@@ -50,6 +50,7 @@ celerybeat.pid
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # Docker
 *.log
